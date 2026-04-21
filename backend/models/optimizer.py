@@ -124,13 +124,17 @@ def _query_players(session, era, season, min_height, max_height, positions) -> p
         "id": p.id, "name": p.name, "position": p.position,
         "height_inches": p.height_inches, "era": p.era, "season": p.season,
         "team": p.team, "fg_pct": p.fg_pct or 0, "three_pt_pct": p.three_pt_pct or 0,
-        "ts_pct": p.ts_pct or 0, "offensive_rating": p.offensive_rating or 110,
-        "defensive_rating": p.defensive_rating or 110, "net_rating": p.net_rating or 0,
+        "ts_pct": p.ts_pct,
+        "offensive_rating": p.offensive_rating,
+        "defensive_rating": p.defensive_rating,
+        "net_rating": p.net_rating,
         "rebounds": p.rebounds or 0, "assists": p.assists or 0, "blocks": p.blocks or 0,
         "steals": p.steals or 0, "points": p.points or 0, "turnovers": p.turnovers or 0,
-        "usage_rate": p.usage_rate or 0, "win_shares": p.win_shares or 0,
-        "win_shares_per48": p.win_shares_per48 or 0, "bpm": p.bpm or 0,
-        "vorp": p.vorp or 0, "per": p.per or 0,
+        "usage_rate": p.usage_rate,
+        "win_shares": p.win_shares,
+        "win_shares_per48": p.win_shares_per48,
+        "bpm": p.bpm,
+        "vorp": p.vorp or 0, "per": p.per,
         "is_ball_handler": bool(p.is_ball_handler),
         "is_rim_protector": bool(p.is_rim_protector),
         "is_three_point_specialist": bool(p.is_three_point_specialist),
@@ -147,17 +151,22 @@ def _query_players(session, era, season, min_height, max_height, positions) -> p
 def _score(row: dict, weights: dict, maxvals: dict) -> float:
     """
     Score a player using normalized stats.
-    Handles both positive weights (higher = better) and
-    negative weights (lower = better, e.g. defensive_rating).
-    For negative weights: score += |w| * (1 - val/max) so lower values score higher.
+    Skips any stat that is None (not recorded for that era) so older players
+    aren't unfairly penalized — the weight is redistributed to available stats.
     """
     score = 0.0
+    available_weight = 0.0
+    total_weight = sum(abs(w) for w in weights.values())
+
     for col, w in weights.items():
-        val = float(row.get(col, 0) or 0)
+        val = row.get(col, None)
+        if val is None:
+            continue  # stat not recorded for this era — skip it
+        val = float(val)
         mx  = maxvals.get(col, 1) or 1
+        available_weight += abs(w)
         if w < 0:
-            # Lower is better: invert so best (lowest) value scores highest
-            mn = maxvals.get(f"{col}_min", 0)
+            mn  = maxvals.get(f"{col}_min", 0)
             rng = mx - mn
             if rng > 0:
                 score += abs(w) * (1.0 - (val - mn) / rng)
@@ -165,6 +174,11 @@ def _score(row: dict, weights: dict, maxvals: dict) -> float:
                 score += abs(w)
         else:
             score += w * (val / mx)
+
+    # Rescale score so players with fewer available stats aren't disadvantaged
+    if available_weight > 0 and available_weight < total_weight:
+        score = score * (total_weight / available_weight)
+
     return score
 
 

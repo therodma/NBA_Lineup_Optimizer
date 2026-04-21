@@ -13,14 +13,30 @@ from backend.models.database import get_session, init_db, Player
 from sqlalchemy import text
 
 SEASONS = [
-    "2016-17", "2017-18", "2018-19", "2019-20",
+    "1979-80", "1980-81", "1981-82", "1982-83", "1983-84", "1984-85",
+    "1985-86", "1986-87", "1987-88", "1988-89", "1989-90",
+    "1990-91", "1991-92", "1992-93", "1993-94", "1994-95",
+    "1995-96", "1996-97", "1997-98", "1998-99", "1999-00",
+    "2000-01", "2001-02", "2002-03", "2003-04", "2004-05",
+    "2005-06", "2006-07", "2007-08", "2008-09", "2009-10",
+    "2010-11", "2011-12", "2012-13", "2013-14", "2014-15",
+    "2015-16", "2016-17", "2017-18", "2018-19", "2019-20",
     "2020-21", "2021-22", "2022-23", "2023-24"
 ]
 
+# Seasons where NBA.com advanced stats (ORTG/DRTG/BPM) are NOT available
+NBA_API_UNAVAILABLE_BEFORE = "1996-97"
+
 ERA_MAP = {
-    "2016-17": "2010s", "2017-18": "2010s", "2018-19": "2010s",
-    "2019-20": "2020s", "2020-21": "2020s", "2021-22": "2020s",
-    "2022-23": "2020s", "2023-24": "2020s",
+    **{s: "1980s" for s in ["1979-80","1980-81","1981-82","1982-83","1983-84",
+                             "1984-85","1985-86","1986-87","1987-88","1988-89","1989-90"]},
+    **{s: "1990s" for s in ["1990-91","1991-92","1992-93","1993-94","1994-95",
+                             "1995-96","1996-97","1997-98","1998-99","1999-00"]},
+    **{s: "2000s" for s in ["2000-01","2001-02","2002-03","2003-04","2004-05",
+                             "2005-06","2006-07","2007-08","2008-09","2009-10"]},
+    **{s: "2010s" for s in ["2010-11","2011-12","2012-13","2013-14","2014-15",
+                             "2015-16","2016-17","2017-18","2018-19"]},
+    **{s: "2020s" for s in ["2019-20","2020-21","2021-22","2022-23","2023-24"]},
 }
 
 # NBA.com position groups
@@ -93,6 +109,11 @@ def _role_flags(pos, ast, blk, fg3):
 
 def fetch_season_data(season):
     print(f"  [{season}] fetching...")
+
+    # Seasons before ~1996-97 are not available on NBA.com API — skip API, use BBRef only
+    if season < NBA_API_UNAVAILABLE_BEFORE:
+        return _fetch_bbref_season(season)
+
     frames_base = []
     frames_adv  = []
 
@@ -105,7 +126,7 @@ def fetch_season_data(season):
             frames_adv.append(a)
 
     if not frames_base:
-        return pd.DataFrame()
+        return _fetch_bbref_season(season)  # fallback to BBRef
 
     base = pd.concat(frames_base, ignore_index=True)
     adv  = pd.concat(frames_adv,  ignore_index=True) if frames_adv else pd.DataFrame()
@@ -120,56 +141,105 @@ def fetch_season_data(season):
     if not bio.empty and all(c in bio.columns for c in bio_keep):
         df = df.merge(bio[bio_keep], on="PLAYER_ID", how="left")
 
-    # Remove duplicates (player on multiple teams)
     df = df.drop_duplicates(subset=["PLAYER_ID"], keep="first")
     df["season"] = season
+    df["_source"] = "nba_api"
     print(f"  [{season}] {len(df)} players")
     return df
 
 
+def _fetch_bbref_season(season):
+    """Fetch a season from Basketball Reference for pre-API eras."""
+    import sys, os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from backend.scrapers.bbref_scraper import scrape_season_advanced, scrape_season_per36, merge_and_clean
+
+    year = int(season.split("-")[0]) + 1
+    try:
+        adv = scrape_season_advanced(year)
+        p36 = scrape_season_per36(year)
+        if adv.empty or p36.empty:
+            return pd.DataFrame()
+        df = merge_and_clean(adv, p36)
+        df["season"] = season
+        df["_source"] = "bbref"
+        print(f"  [{season}] {len(df)} players (BBRef)")
+        return df
+    except Exception as e:
+        print(f"  [{season}] BBRef failed: {e}")
+        return pd.DataFrame()
+
+
 def build_players(df, season):
     players = []
+    source = df.get("_source", pd.Series(["nba_api"] * len(df))).iloc[0] if len(df) > 0 else "nba_api"
+    is_bbref = source == "bbref"
+
     for _, row in df.iterrows():
-        if float(row.get("MIN", 0) or 0) < 5:
+        min_val = float(row.get("MIN", row.get("minutes_per_game", 0)) or 0)
+        if min_val < 5:
             continue
 
-        ast = float(row.get("AST", 0) or 0)
-        blk = float(row.get("BLK", 0) or 0)
-        reb = float(row.get("REB", 0) or 0)
-        pts = float(row.get("PTS", 0) or 0)
-        fg3 = float(row.get("FG3_PCT", 0) or 0)
+        ast = float(row.get("AST", row.get("assists", 0)) or 0)
+        blk = float(row.get("BLK", row.get("blocks", 0)) or 0)
+        reb = float(row.get("REB", row.get("rebounds", 0)) or 0)
+        pts = float(row.get("PTS", row.get("points", 0)) or 0)
+        fg3 = float(row.get("FG3_PCT", row.get("three_pt_pct", 0)) or 0)
 
         pos_group = str(row.get("POS_GROUP", "F"))
         pos = _assign_position(pos_group, ast, blk, reb, pts)
-        flags   = _role_flags(pos, ast, blk, fg3)
-        ws      = float(row.get("W", 0) or 0) * 0.12
-        min_val = max(float(row.get("MIN", 1) or 1), 1)
+        flags = _role_flags(pos, ast, blk, fg3)
+        ws    = float(row.get("W", row.get("win_shares", 0)) or 0)
+        if not is_bbref:
+            ws = ws * 0.12  # NBA API gives wins, not win shares
+        min_val = max(min_val, 1)
+
+        # Stats that may not exist for older seasons — store as None so frontend shows N/A
+        off_rtg = row.get("OFF_RATING", row.get("offensive_rating", None))
+        def_rtg = row.get("DEF_RATING", row.get("defensive_rating", None))
+        net_rtg = row.get("NET_RATING", row.get("net_rating", None))
+        ts      = row.get("TS_PCT", row.get("ts_pct", None))
+        usg     = row.get("USG_PCT", row.get("usage_rate", None))
+        bpm_val = row.get("bpm", None)
+        per_val = row.get("PIE", row.get("per", None))
+
+        off_rtg = float(off_rtg) if off_rtg is not None and str(off_rtg) != "nan" else None
+        def_rtg = float(def_rtg) if def_rtg is not None and str(def_rtg) != "nan" else None
+        net_rtg = float(net_rtg) if net_rtg is not None and str(net_rtg) != "nan" else None
+        ts      = float(ts)      if ts      is not None and str(ts)      != "nan" else None
+        usg     = float(usg)     if usg     is not None and str(usg)     != "nan" else None
+        bpm_val = float(bpm_val) if bpm_val is not None and str(bpm_val) != "nan" else None
+        per_val = float(per_val) if per_val is not None and str(per_val) != "nan" else None
+        if per_val is not None and not is_bbref:
+            per_val = per_val * 100  # NBA API PIE -> scale to PER range
+        if bpm_val is None and net_rtg is not None:
+            bpm_val = net_rtg * 0.25  # estimate BPM from net rating if missing
 
         players.append(Player(
-            name             = str(row.get("PLAYER_NAME", "")),
+            name             = str(row.get("PLAYER_NAME", row.get("name", ""))),
             position         = pos,
-            height_inches    = int(float(row.get("PLAYER_HEIGHT_INCHES", 0) or 0)),
+            height_inches    = int(float(row.get("PLAYER_HEIGHT_INCHES", row.get("height_inches", 0)) or 0)),
             era              = ERA_MAP.get(season, "2020s"),
             season           = season,
-            team             = str(row.get("TEAM_ABBREVIATION", "")),
-            fg_pct           = float(row.get("FG_PCT", 0) or 0),
+            team             = str(row.get("TEAM_ABBREVIATION", row.get("team", ""))),
+            fg_pct           = float(row.get("FG_PCT", row.get("fg_pct", 0)) or 0),
             three_pt_pct     = fg3,
-            ts_pct           = float(row.get("TS_PCT", 0) or 0),
-            offensive_rating = float(row.get("OFF_RATING", 110) or 110),
-            defensive_rating = float(row.get("DEF_RATING", 110) or 110),
-            net_rating       = float(row.get("NET_RATING", 0) or 0),
+            ts_pct           = ts,
+            offensive_rating = off_rtg,
+            defensive_rating = def_rtg,
+            net_rating       = net_rtg,
             rebounds         = reb,
             assists          = ast,
             blocks           = blk,
-            steals           = float(row.get("STL", 0) or 0),
+            steals           = float(row.get("STL", row.get("steals", 0)) or 0),
             points           = pts,
-            turnovers        = float(row.get("TOV", 0) or 0),
-            usage_rate       = float(row.get("USG_PCT", 0) or 0) * 100,
-            win_shares       = ws,
-            win_shares_per48 = ws / min_val * 48,
-            bpm              = float(row.get("NET_RATING", 0) or 0) * 0.25,
-            vorp             = 0.0,
-            per              = float(row.get("PIE", 0) or 0) * 100,
+            turnovers        = float(row.get("TOV", row.get("turnovers", 0)) or 0),
+            usage_rate       = (usg * 100) if usg is not None else None,
+            win_shares       = ws if ws != 0 else None,
+            win_shares_per48 = (ws / min_val * 48) if ws else None,
+            bpm              = bpm_val,
+            vorp             = float(row.get("vorp", 0) or 0),
+            per              = per_val,
             **flags
         ))
     return players

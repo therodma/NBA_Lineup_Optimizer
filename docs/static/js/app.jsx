@@ -221,13 +221,13 @@ function PlayerCard({ player }) {
         ["AST", player.assists],
         ["BLK", player.blocks],
         ["STL", player.steals],
-        ["3PT%", (player.three_pt_pct * 100).toFixed(1) + "%"],
-        ["TS%",  (player.ts_pct * 100).toFixed(1) + "%"],
-        ["ORTG", player.offensive_rating],
-        ["DRTG", player.defensive_rating],
-        ["BPM",  player.bpm],
-        ["PER",  player.per],
-        ["WS",   player.win_shares],
+        ["3PT%", player.three_pt_pct != null ? (player.three_pt_pct * 100).toFixed(1) + "%" : "N/A"],
+        ["TS%",  player.ts_pct != null ? (player.ts_pct * 100).toFixed(1) + "%" : "N/A"],
+        ["ORTG", player.offensive_rating ?? "N/A"],
+        ["DRTG", player.defensive_rating ?? "N/A"],
+        ["BPM",  player.bpm ?? "N/A"],
+        ["PER",  player.per ?? "N/A"],
+        ["WS",   player.win_shares ?? "N/A"],
       ].map(([lbl, val]) => (
         <div className="stat-row" key={lbl}>
           <span className="stat-label">{lbl}</span>
