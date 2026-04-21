@@ -1,0 +1,13 @@
+flask
+flask-cors
+requests
+beautifulsoup4
+pandas
+numpy
+scikit-learn
+scipy
+plotly
+sqlalchemy
+lxml
+fake-useragent
+python-dotenv
