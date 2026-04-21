@@ -2,7 +2,7 @@
 
 A full-stack data science web app that scrapes real NBA statistics and generates optimal lineups using machine learning and combinatorial optimization.
 
-🔴 **Live Demo:** [https://nba-lineup-optimizer.onrender.com](https://nba-lineup-optimizer.onrender.com)
+🟢 **Live Demo:** [https://therodma.github.io/NBA_Lineup_Optimizer](https://therodma.github.io/NBA_Lineup_Optimizer)
 
 ---
 
