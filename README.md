@@ -4,6 +4,8 @@ A full-stack data science web app that scrapes real NBA statistics and generates
 
 🟢 **Live Demo:** [https://therodma.github.io/NBA_Lineup_Optimizer](https://therodma.github.io/NBA_Lineup_Optimizer)
 
+🔗 **GitHub:** [https://github.com/therodma/NBA_Lineup_Optimizer](https://github.com/therodma/NBA_Lineup_Optimizer)
+
 ---
 
 ## Project Structure
