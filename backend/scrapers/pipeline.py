@@ -218,7 +218,7 @@ def build_players(df, season):
         players.append(Player(
             name             = str(row.get("PLAYER_NAME", row.get("name", ""))),
             position         = pos,
-            height_inches    = int(float(row.get("PLAYER_HEIGHT_INCHES", row.get("height_inches", 0)) or 0)),
+            height_inches    = int(float(row.get("PLAYER_HEIGHT_INCHES", row.get("height_inches", 0) or 0) or 0)) if str(row.get("PLAYER_HEIGHT_INCHES", row.get("height_inches", 0) or 0)) != "nan" else 0,
             era              = ERA_MAP.get(season, "2020s"),
             season           = season,
             team             = str(row.get("TEAM_ABBREVIATION", row.get("team", ""))),
@@ -258,16 +258,14 @@ def run_pipeline():
     print(f"Fetching {len(SEASONS)} seasons (parallel, ~2 min)...\n")
     season_data = {}
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(fetch_season_data, s): s for s in SEASONS}
-        for future in as_completed(futures):
-            season = futures[future]
-            try:
-                result = future.result()
-                if not result.empty:
-                    season_data[season] = result
-            except Exception as e:
-                print(f"  [{season}] FAILED: {e}")
+    # Sequential fetching to avoid BBRef rate limiting (403s from parallel requests)
+    for season in SEASONS:
+        try:
+            result = fetch_season_data(season)
+            if not result.empty:
+                season_data[season] = result
+        except Exception as e:
+            print(f"  [{season}] FAILED: {e}")
 
     print("\nLoading into database...")
     session = get_session()
