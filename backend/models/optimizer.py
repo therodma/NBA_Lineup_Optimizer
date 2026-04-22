@@ -489,8 +489,9 @@ def generate_lineup(
     if df.empty:
         return {"error": "No players found matching filters. Run the data pipeline first."}
 
-    # Minimum 30 games played for all lineup types
-    df = df[df["games_played"] >= 30].copy()
+    # Minimum games played — skip filter if games_played not populated
+    if df["games_played"].max() > 0:
+        df = df[df["games_played"] >= 30].copy()
     if df.empty:
         return {"error": "No players found who played at least 30 games matching these filters."}
 

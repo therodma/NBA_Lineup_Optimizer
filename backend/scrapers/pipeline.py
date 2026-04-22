@@ -240,6 +240,10 @@ def build_players(df, season):
             bpm              = bpm_val,
             vorp             = float(row.get("vorp", 0) or 0),
             per              = per_val,
+            games_played     = int(float(row.get("GP", row.get("games_played", 0)) or 0)),
+            minutes_per_game = round(float(row.get("MIN", row.get("minutes_per_game", 0)) or 0) / max(int(float(row.get("GP", 1) or 1)), 1), 1),
+            three_pt_attempts= int(float(row.get("FG3A", row.get("three_pt_attempts", 0)) or 0)),
+            fg_attempts      = int(float(row.get("FGA", row.get("fg_attempts", 0)) or 0)),
             **flags
         ))
     return players
