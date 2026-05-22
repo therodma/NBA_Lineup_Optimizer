@@ -520,8 +520,8 @@ def generate_lineup(
 
     if lineup_type == "best_shooting":
         df = df[
-            (df["three_pt_attempts"] >= 100) &   # min ~1.5 attempts/game over 65 games
-            (df["fg_attempts"] >= 200) &           # meaningful offensive role
+            (df["three_pt_attempts"] >= 3.0) &    # min 3 attempts/game (real shooter)
+            (df["fg_attempts"] >= 6.0) &           # meaningful offensive role
             (df["minutes_per_game"] >= 20)         # starter/rotation player
         ].copy()
 
@@ -546,7 +546,7 @@ def generate_lineup(
 
     elif lineup_type == "small_ball":
         df = df[
-            (df["three_pt_attempts"] >= 100) &    # must be a real shooter
+            (df["three_pt_attempts"] >= 3.0) &    # must be a real shooter
             (df["minutes_per_game"] >= 20)
         ].copy()
 
