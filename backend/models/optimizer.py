@@ -255,18 +255,20 @@ def _notable_snubs(df: pd.DataFrame, pos: str, picked: dict,
     Find players (primary OR secondary at this position) who scored highly
     but weren't picked, and explain why.
     """
-    # Include both primary and secondary candidates for this position
-    primary   = df[df["position"] == pos].copy()
+    # Use pre-computed _score column if available (avoids re-scoring entire df)
+    primary   = df[df["position"] == pos]
     secondary = df[
         (df["secondary_position"] == pos) & (df["position"] != pos)
-    ].copy()
+    ]
 
     frames = [f for f in [primary, secondary] if not f.empty]
     if not frames:
         return []
 
     pos_df = pd.concat(frames, ignore_index=True).drop_duplicates(subset=["id"])
-    pos_df["_score"] = pos_df.apply(lambda r: _score(r.to_dict(), weights, maxvals), axis=1)
+    if "_score" not in pos_df.columns:
+        pos_df = pos_df.copy()
+        pos_df["_score"] = pos_df.apply(lambda r: _score(r.to_dict(), weights, maxvals), axis=1)
     top20 = pos_df.nlargest(20, "_score").to_dict("records")
 
     snubs = []

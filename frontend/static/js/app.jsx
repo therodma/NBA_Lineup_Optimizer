@@ -280,11 +280,30 @@ function App() {
   const [error, setError]             = useState("");
   const progressRef                   = useRef(null);
 
+  const [filtersLoading, setFiltersLoading] = useState(true);
+
   useEffect(() => {
-    api.filters()
-      .then(r => r.json())
-      .then(setFilters)
-      .catch(err => console.error("Failed to load filters:", err));
+    let attempts = 0;
+    const load = () => {
+      attempts++;
+      api.filters()
+        .then(r => r.json())
+        .then(data => {
+          if (data.eras && data.eras.length > 0) {
+            setFilters(data);
+            setFiltersLoading(false);
+          } else if (attempts < 5) {
+            setTimeout(load, 4000);
+          } else {
+            setFiltersLoading(false);
+          }
+        })
+        .catch(() => {
+          if (attempts < 5) setTimeout(load, 4000);
+          else setFiltersLoading(false);
+        });
+    };
+    load();
   }, []);
 
   const togglePos = (pos) => {
@@ -314,8 +333,11 @@ function App() {
         const pct = Math.round((stepRef.current / STEPS.length) * 90);
         setProgress(pct);
         setProgressMsg(STEPS[stepRef.current]);
+      } else {
+        // Slowly crawl toward 99% so bar never looks frozen
+        setProgress(prev => prev < 99 ? prev + 1 : 99);
+        setProgressMsg("Finalizing lineup...");
       }
-      // Once all steps shown, just hold — don't go to 100
     }, 600);
   };
 
@@ -384,14 +406,14 @@ function App() {
             <h3>Filters</h3>
 
             <label>Era</label>
-            <select value={era} onChange={e => setEra(e.target.value)}>
-              <option value="">All Eras</option>
+            <select value={era} onChange={e => setEra(e.target.value)} disabled={filtersLoading}>
+              <option value="">{filtersLoading ? "Loading..." : "All Eras"}</option>
               {filters.eras.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
 
             <label>Season</label>
-            <select value={season} onChange={e => setSeason(e.target.value)}>
-              <option value="">All Seasons</option>
+            <select value={season} onChange={e => setSeason(e.target.value)} disabled={filtersLoading}>
+              <option value="">{filtersLoading ? "Loading..." : "All Seasons"}</option>
               {filters.seasons.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
