@@ -107,7 +107,8 @@ def _query_players(session, era, season, min_height, max_height, positions) -> p
     q = session.query(Player)
     if era:
         q = q.filter(Player.era == era)
-    if season:
+        # era overrides season — ignore season filter when era is set
+    elif season:
         q = q.filter(Player.season == season)
     if min_height:
         q = q.filter(Player.height_inches >= min_height)

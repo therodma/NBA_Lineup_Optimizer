@@ -406,15 +406,15 @@ function App() {
             <h3>Filters</h3>
 
             <label>Era</label>
-            <select value={era} onChange={e => setEra(e.target.value)} disabled={filtersLoading}>
+            <select value={era} onChange={e => { setEra(e.target.value); setSeason(""); }} disabled={filtersLoading}>
               <option value="">{filtersLoading ? "Loading..." : "All Eras"}</option>
               {filters.eras.map(e => <option key={e} value={e}>{e}</option>)}
             </select>
 
-            <label>Season</label>
-            <select value={season} onChange={e => setSeason(e.target.value)} disabled={filtersLoading}>
-              <option value="">{filtersLoading ? "Loading..." : "All Seasons"}</option>
-              {filters.seasons.map(s => <option key={s} value={s}>{s}</option>)}
+            <label>Season {era && <span style={{fontSize:"0.75em",color:"#b0aa9f",fontWeight:"normal"}}>(ignored when era is set)</span>}</label>
+            <select value={season} onChange={e => setSeason(e.target.value)} disabled={filtersLoading || !!era}>
+              <option value="">{era ? "— era overrides season —" : (filtersLoading ? "Loading..." : "All Seasons")}</option>
+              {!era && filters.seasons.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
 
             <label>Positions (leave blank for all)</label>
