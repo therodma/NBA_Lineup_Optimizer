@@ -289,17 +289,11 @@ function App() {
       api.filters()
         .then(r => r.json())
         .then(data => {
-          if (data.eras && data.eras.length > 0) {
-            setFilters(data);
-            setFiltersLoading(false);
-          } else if (attempts < 5) {
-            setTimeout(load, 4000);
-          } else {
-            setFiltersLoading(false);
-          }
+          setFilters(data);
+          setFiltersLoading(false);
         })
         .catch(() => {
-          if (attempts < 5) setTimeout(load, 4000);
+          if (attempts < 4) setTimeout(load, 5000);
           else setFiltersLoading(false);
         });
     };
