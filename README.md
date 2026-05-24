@@ -1,6 +1,6 @@
 # NBA Lineup Optimizer
 
-A full-stack data science web app that scrapes real NBA statistics and generates optimal lineups using machine learning and combinatorial optimization.
+A full-stack web app that uses real NBA statistics to generate optimal lineups across every season from 1996–97 to 2023–24.
 
 🟢 **Live Demo:** [https://therodma.github.io/NBA_Lineup_Optimizer](https://therodma.github.io/NBA_Lineup_Optimizer)
 
@@ -31,6 +31,7 @@ nba_lineup_optimizer/
 │   └── static/
 │       ├── css/styles.css
 │       └── js/app.jsx          # React + Plotly frontend
+├── docs/                       # GitHub Pages deployment (mirrors frontend)
 ├── requirements.txt
 └── run.py                      # App entry point
 ```
@@ -46,17 +47,29 @@ pip install -r requirements.txt
 ```
 
 ### 2. Scrape data and populate the database
-This takes 15–30 minutes due to respectful rate limiting between requests.
+Takes 15–30 minutes due to rate limiting between requests.
 ```bash
 python backend/scrapers/pipeline.py
 ```
-This scrapes Basketball Reference (2016–⚠️ Failed to connect to server. Make sure the backend is running.2024) and NBA.com estimated metrics, then loads everything into `data/nba.db`.
 
 ### 3. Run the web server
 ```bash
 python run.py
 ```
-Open your browser at: **http://localhost:5000**
+Open your browser at: **http://localhost:8000**
+
+---
+
+## Features
+
+- **6 lineup types** — Best Shooting, Best Offense, Best Defense, Most Balanced, Small Ball, Traditional
+- **28 seasons** of data (1996–97 through 2023–24)
+- **Era filter** — selecting an era searches across all seasons within it and ignores any specific season selection
+- **Season filter** — pin results to a single season (disabled when an era is selected)
+- **Position filter** — restrict the pool to specific positions
+- **Why This Lineup Works** — per-player explanations with notable snubs at each position
+- **4 charts** — Radar profiles, Offensive vs Defensive Rating scatter, Shot Distribution, Synergy Metrics
+- **Win prediction** — projected record over 82 games based on net rating
 
 ---
 
@@ -64,28 +77,26 @@ Open your browser at: **http://localhost:5000**
 
 | Type | Description |
 |------|-------------|
-| Best Shooting | Maximizes 3PT%, TS%, FG% with spacing |
-| Best Offense | Maximizes ORTG, PER, assists, efficiency |
-| Best Defense | Minimizes DRTG, maximizes blocks/steals |
-| Most Balanced | Optimizes BPM, win shares, two-way play |
-| Small Ball | 4-guard/wing lineup, no traditional center |
+| Best Shooting | Maximizes 3PT%, TS%, FG% and floor spacing |
+| Best Offense | Maximizes ORTG, PER, scoring and playmaking |
+| Best Defense | Minimizes DRTG, maximizes blocks and steals |
+| Most Balanced | Optimizes BPM, win shares, two-way impact |
+| Small Ball | Perimeter-heavy lineup, no traditional center |
 | Traditional | True center, rebounding, rim protection |
 
 ---
 
 ## Optimization Algorithm
 
-1. Query players from DB matching user filters (era, season, height, position)
-2. Normalize all stat columns using MinMaxScaler
-3. Score each player using weighted stat formula per lineup type
-4. Build candidate pool (top 8–10 per position)
-5. Evaluate all 5-player combinations from the pool
-6. Apply hard constraints (ball handler, rim protector, min rebounds, min blocks)
-7. Apply synergy bonuses (spacing, role diversity, usage balance)
-8. Return highest-scoring valid lineup
+1. Query players from DB matching filters (era, season, position)
+2. Apply per-lineup-type qualification filters (min MPG, usage, attempts)
+3. Normalize stats and score each player using weighted formula
+4. Build position pools (primary + secondary position eligibility)
+5. Select best available player per slot, no repeats
+6. Apply synergy bonuses (spacing, ball handler, rim protector)
+7. Return lineup with team stats and win prediction
 
 ### Win% Prediction
-Uses net rating approximation:
 ```
 wins = 41 + (avg_net_rating × 4.0)
 win% = wins / 82
@@ -100,28 +111,26 @@ win% = wins / 82
 | POST | `/api/lineup` | Generate optimal lineup |
 | GET | `/api/filters` | Available eras, seasons, positions |
 | GET | `/api/players` | Search players |
-| POST | `/api/chart/radar` | Radar chart data |
-| POST | `/api/chart/efficiency` | Efficiency scatter data |
+| GET | `/api/health` | Server health check |
 
 ### POST /api/lineup
 ```json
 {
   "lineup_type": "best_shooting",
   "era": "2020s",
-  "season": "2023-24",
-  "min_height": null,
-  "max_height": null,
+  "season": null,
   "positions": ["PG", "SG", "SF"]
 }
 ```
+> Note: if `era` is set, `season` is ignored.
 
 ---
 
 ## Data Sources
 
-- **Basketball Reference** — Advanced stats, per-36 stats (2016–2024)
-- **NBA.com** — Estimated offensive/defensive ratings
-- **ESPN** — Roster height/position data
+- **Basketball Reference** — Per-game stats, advanced stats (1996–2024)
+- **NBA.com** — Offensive/defensive ratings, net rating
+- **ESPN** — Roster height and position data
 
 ---
 
@@ -129,6 +138,6 @@ win% = wins / 82
 
 - **Backend**: Python, Flask, SQLAlchemy, SQLite
 - **Scraping**: BeautifulSoup, Requests
-- **Analysis**: Pandas, NumPy, scikit-learn (MinMaxScaler)
+- **Analysis**: Pandas, NumPy
 - **Frontend**: React 18 (CDN), Plotly.js
-- **Charts**: Radar, scatter, grouped bar charts
+- **Hosting**: Render (backend), GitHub Pages (frontend)
