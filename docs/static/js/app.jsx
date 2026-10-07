@@ -351,6 +351,14 @@ function App() {
     setResult(null);
     startProgress();
     try {
+      const alive = await api.wakeServer(() => setProgressMsg("Waking up server (free tier cold start)..."));
+      if (!alive) {
+        stopProgress(() => {
+          setLoading(false);
+          setError("Server is taking too long to wake up. Please try again in a moment.");
+        });
+        return;
+      }
       const resp = await api.lineup({
         lineup_type: lineupType,
         era:         era || null,
@@ -366,7 +374,7 @@ function App() {
     } catch (e) {
       stopProgress(() => {
         setLoading(false);
-        setError("Failed to connect to server. Make sure the backend is running.");
+        setError("Server is unavailable. Please try again in a moment.");
       });
     }
   };
